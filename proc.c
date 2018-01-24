@@ -38,10 +38,10 @@ struct cpu*
 mycpu(void)
 {
   int apicid, i;
-  
+
   if(readeflags()&FL_IF)
     panic("mycpu called with interrupts enabled\n");
-  
+
   apicid = lapicid();
   // APIC IDs are not guaranteed to be contiguous. Maybe we should have
   // a reverse map, or reserve a register to store &cpus[i].
@@ -124,7 +124,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   p = allocproc();
-  
+
   initproc = p;
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
@@ -275,7 +275,7 @@ wait(void)
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
-  
+
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for exited children.
@@ -325,7 +325,7 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  
+
   for(;;){
     // Enable interrupts on this processor.
     sti();
@@ -418,7 +418,7 @@ void
 sleep(void *chan, struct spinlock *lk)
 {
   struct proc *p = myproc();
-  
+
   if(p == 0)
     panic("sleep");
 
@@ -530,5 +530,32 @@ procdump(void)
         cprintf(" %p", pc[i]);
     }
     cprintf("\n");
+  }
+}
+
+// Current process Status
+int
+getprocsinfo()
+{
+  struct proc *p;
+  uint procnum=0;
+
+  sti();      //Interrupt Enabled on the processor
+  acquire(&ptable.lock);    //Lock the process table
+
+  if(!myproc()->killed){
+    cprintf("pid\tpname\n");
+    for(p=ptable.proc; p<&ptable.proc[NPROC]; p++){
+      if(p->pid != 0){
+        procnum++;
+        cprintf("%d\t%s\n", p->pid, p->name);
+      }
+    }
+    cprintf("\nRunning %d processes in total\n", procnum);
+    release(&ptable.lock);  //Release the lock on process table
+    return procnum;         //Return number of processes running
+  }else{
+    release(&ptable.lock);
+    return -1;
   }
 }
