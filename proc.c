@@ -535,7 +535,7 @@ procdump(void)
 
 // Current process Status
 int
-getprocsinfo()
+getprocsinfo(struct procinfo *procptr)
 {
   struct proc *p;
   uint procnum=0;
@@ -547,8 +547,10 @@ getprocsinfo()
     cprintf("pid\tpname\n");
     for(p=ptable.proc; p<&ptable.proc[NPROC]; p++){
       if(p->pid != 0){
+        procptr->pid = p->pid;
+        procptr->pname = p->name;
         procnum++;
-        cprintf("%d\t%s\n", p->pid, p->name);
+        cprintf("%d\t%s\n", procptr->pid, procptr->pname);
       }
     }
     cprintf("\nRunning %d processes in total\n", procnum);
