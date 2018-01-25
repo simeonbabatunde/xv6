@@ -2,11 +2,8 @@
 #include "stat.h"
 #include "user.h"
 #include "fcntl.h"
+#include "getprocinfo.h"
 
-struct procinfo{
-  int pid;
-  char *pname;
-};
 
 void getprocsinfotest(){
   struct procinfo procstr;
