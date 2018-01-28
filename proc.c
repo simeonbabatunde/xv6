@@ -540,25 +540,19 @@ getprocsinfo(struct procinfo *procptr)
 {
   struct proc *p;
   uint procnum=0;
-  //Dynamically allocate memory for to the name array
-  // procptr->pname = (char *)malloc(sizeof(char *) * 64);
-  // for(int i=0; i<64; i++){
-  //   procptr->pname[i] = malloc(50 * sizeof(char *));
-  // }
+  struct procinfo *placeholder = procptr;
 
   sti();      //Interrupt Enabled on the processor
   acquire(&ptable.lock);    //Lock the process table
 
   if(!myproc()->killed){
-    for(p=ptable.proc; p<&ptable.proc[NPROC]; p++){
-      if(p->pid != 0){
-        procptr->pid[procnum] = p->pid;
-        safestrcpy(procptr->pname[procnum], p->name,16);
-        // cprintf("%s here\n",p->name);
+    for(p=ptable.proc; p<&ptable.proc[NPROC]; p++, placeholder++){
+      if(p->state != UNUSED){           //check for used processes
+        placeholder->pid = p->pid;
+        safestrcpy(placeholder->pname, p->name,16);
         procnum++;
       }
     }
-    cprintf("\nRunning %d processes in total\n", procnum);
     release(&ptable.lock);  //Release the lock on process table
     return procnum;         //Return number of processes running
   }else{
