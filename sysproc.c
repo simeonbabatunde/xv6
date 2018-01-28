@@ -94,6 +94,8 @@ sys_uptime(void)
 int
 sys_getprocsinfo()
 {
-  struct procinfo procstr;
-  return getprocsinfo(&procstr);
+  struct procinfo* procstr;
+  if(argptr(0, (void* )&procstr, sizeof( *procstr ) ) < 0)
+    return -1;
+  return getprocsinfo(procstr);
 }

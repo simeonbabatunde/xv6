@@ -103,7 +103,7 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
-extern int sys_getprocsinfo();
+extern int sys_getprocsinfo(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
