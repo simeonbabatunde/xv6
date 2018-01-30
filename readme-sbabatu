@@ -1,6 +1,24 @@
 CHANGES
 
-1. 
+The following files were modified/created during the course of the system call
+implementation.
 
+1.  getprocsinfo.h - This header file contains the definition of the struct
+    containing the two data members pid and pname
+2.  defs.h - The struct declaration was added at the top, and the function
+    prototype for getprocsinfo function was added.
+3.  user.h - The struct declaration and function prototype was added to expose
+    the syscall index number to user process
+4.  usys.S - getprocinfo macro was added to the list macros
+5.  syscall.h - The system call number 22 was assigned to getprocsinfo
+6.  sysproc.c - The function call was added to this file.
+7.  syscall.c - This file was modified by adding the procsinfo to the list of
+    syscalls
+8.  proc.c - The system call function was implemented in this file. This is
+    where the struc gets populated.
+9.  testgetprocsinfo.c - this is the user space testing program that makes the
+    system call.
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
+All the modifications made will add little to no overhead to the kernel, because
+every block of memory that was dynamically allocated during run time were freed
+after the  execution leaves the context.

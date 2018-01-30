@@ -549,7 +549,7 @@ getprocsinfo(struct procinfo *procptr)
     for(p=ptable.proc; p<&ptable.proc[NPROC]; p++, placeholder++){
       if(p->state != UNUSED){           //check for used processes
         placeholder->pid = p->pid;
-        safestrcpy(placeholder->pname, p->name,16);
+        safestrcpy(placeholder->pname, p->name,21);
         procnum++;
       }
     }
