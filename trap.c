@@ -13,7 +13,7 @@ struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
-
+uint addr;
 void
 tvinit(void)
 {
@@ -36,7 +36,8 @@ idtinit(void)
 void
 trap(struct trapframe *tf)
 {
-  if(tf->trapno == T_SYSCALL){
+
+ if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
       exit();
     myproc()->tf = tf;
@@ -47,6 +48,17 @@ trap(struct trapframe *tf)
   }
 
   switch(tf->trapno){
+  case T_PGFLT:
+    addr = rcr2();
+    
+    if(addr < PGSIZE)       //check if the address is in the first page
+    {
+      cprintf("Segmentation fault. Illegal memory access detected at addr: %x\n", addr);
+      cprintf("killing process: %d\n", myproc()->pid);
+      myproc()->killed = 1;
+      exit();
+    }
+    break;
   case T_IRQ0 + IRQ_TIMER:
     if(cpuid() == 0){
       acquire(&tickslock);
