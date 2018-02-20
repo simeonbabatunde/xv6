@@ -3,18 +3,46 @@ CHANGES
 The following files were modified/created during the implementation of NULL pointer Derefrencing.
 
 1.  exec.c - The loading of program into memory will start from PGSIZE rather than 0.
-    
+
 2.  vm.c - The cpuvm was made to copy from PGSIZE rather than 0;
-    
+
 3.  Makefile - The Linker was editted to load code into 0X1000 instead of 0x0
 
 4.  trap.c - This file was modified to track the occurence of page fault
 
-5.  testnull.c - This file was created to test the NULL Pointer implementation 
+5.  testnull.c - This file was created to test the NULL Pointer implementation
 
-The following files were modified during the implementation of shared pages.
 
-1.  
+The following files were modified/created during the implementation of shared memory access.
+
+1. user.h - The system call prototype for the shared memory access and count was included.
+
+2. Main.c - This file was modified by including the shared memory access initialization
+   function. This allows the pages to be created before main execution completes.
+
+3. sysproc.c - Both the sys_shmem_access and sys_shmem_count were added to the file in a bid to
+   accomplish the system call.
+
+4. Proc.h - The process state was updated to keep track of both the shared memory address and count
+
+5. Proc.c - This file was modified such that the implementation of the fork() function would
+   transfer state from the parent process to the child process.
+
+6. vm.c - The actual shared memory call and count was implemented in this file. The shared
+   memory initialization function was also implemented, in addition to the modification of
+   freevm. A customfree() function was implemented to cater to the need of the exec function.
+
+7. syscall.h - This file was modified to include the system call numbers for both shared memory
+   access and shared memory count.
+
+8. types.h - This file was modified by adding definitions for the shared memory access and counter
+  arrays. It also contain a macro definition of the page size.
+
+9. usys.S - This file was modified by adding the shared memory calls to the list of call stack
+   registered in assembly language.
+
+10. testshmemory.c - This file was created to implement the necessary test cases required in
+    ensuring effective and accurate implementation of the functions and features.
 
 
 

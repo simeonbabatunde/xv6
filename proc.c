@@ -8,6 +8,11 @@
 #include "spinlock.h"
 #include "getprocinfo.h"
 
+extern int shmem_counter[SHMEM_PAGE_NUM];
+extern void* shmem_addr[SHMEM_PAGE_NUM];
+extern int mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);
+
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -197,6 +202,18 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  
+  for(int i=0; i<SHMEM_PAGE_NUM; i++)
+  {
+    np->shmem_access[i] = curproc->shmem_access[i];
+    if(np->shmem_access[i] != NULL){
+    shmem_counter[i]++; 
+    if(mappages(np->pgdir, np->shmem_access[i], PGSIZE, V2P(shmem_addr[i]), PTE_W|PTE_U) == -1){
+       panic("shared memory access not granted");
+    }
+   }
+  }
+  
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;

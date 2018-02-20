@@ -57,7 +57,7 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
 // Create PTEs for virtual addresses starting at va that refer to
 // physical addresses starting at pa. va and size might not
 // be page-aligned.
-static int
+int
 mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 {
   char *a, *last;
@@ -284,10 +284,18 @@ void
 freevm(pde_t *pgdir)
 {
   uint i;
+  struct proc *curproc = myproc();
 
   if(pgdir == 0)
     panic("freevm: no pgdir");
-  deallocuvm(pgdir, KERNBASE, 0);
+  deallocuvm(pgdir, KERNBASE - (curproc->shmem_count)*PGSIZE, 0);
+ 
+  for(i=0; i<SHMEM_PAGE_NUM; i++){
+   if(curproc->shmem_access[i] != 0){
+     curproc->shmem_access[i] = 0;
+     shmem_counter[i]--;
+   }
+  }
   for(i = 0; i < NPDENTRIES; i++){
     if(pgdir[i] & PTE_P){
       char * v = P2V(PTE_ADDR(pgdir[i]));
@@ -296,6 +304,36 @@ freevm(pde_t *pgdir)
   }
   kfree((char*)pgdir);
 }
+
+
+// Free a page table and all the physical memory pages
+// in the user part.
+void
+customfree(pde_t *pgdir)
+{
+  uint i;
+  struct proc *curproc = myproc();
+
+  if(pgdir == 0)
+    panic("freevm: no pgdir");
+  deallocuvm(pgdir, KERNBASE - 4*PGSIZE, 0);
+
+  for(i=0; i<SHMEM_PAGE_NUM; i++){
+   if(curproc->shmem_access[i] != 0){
+     curproc->shmem_access[i] = 0;
+     shmem_counter[i]--;
+   }
+  }
+  for(i = 0; i < NPDENTRIES; i++){
+    if(pgdir[i] & PTE_P){
+      char * v = P2V(PTE_ADDR(pgdir[i]));
+      kfree(v);
+    }
+  }
+  kfree((char*)pgdir);
+}
+
+
 
 // Clear PTE_U on a page. Used to create an inaccessible
 // page beneath the user stack.
@@ -382,6 +420,50 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
   }
   return 0;
 }
+
+
+// Initialize share memery
+void
+shmeminit()
+{
+  int i;
+  for (i = 0; i < SHMEM_PAGE_NUM; ++i) {
+    shmem_counter[i] = 0;
+    if ((shmem_addr[i] = kalloc()) == 0)
+      panic("shameminit failed");
+  }
+}
+
+
+void*
+shmem_access(int page_number)
+{
+  struct proc *process = myproc();
+  // Invalid page number
+  if(page_number < 0 || page_number > 3)
+    return NULL;
+  // Check if already has access to the given page
+  if(process->shmem_access[page_number] != 0)
+    return process->shmem_access[page_number];
+  // Check if the address space is full
+  void* va = (void*) (KERNBASE - (process->shmem_count + 1) * PGSIZE);
+  if((process->sz) >= (uint)va)
+    return NULL;
+  // If VA is available, grant the access
+  if (mappages(process->pgdir, va, PGSIZE, (uint)P2V(shmem_addr[page_number]), PTE_W|PTE_U) == -1)
+    panic("shmem_access");
+  process->shmem_access[page_number] = va;
+  process->shmem_count++;
+  shmem_counter[page_number]++;
+  return va;
+}
+
+int
+shmem_count(int page_number)
+{
+  return shmem_counter[page_number];
+}
+
 
 //PAGEBREAK!
 // Blank page.

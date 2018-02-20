@@ -99,3 +99,23 @@ sys_getprocsinfo()
     return -1;
   return getprocsinfo(procstr);
 }
+
+// Share memory access
+int
+sys_shmem_access(void)
+{
+  int page_number;
+  argint(0, &page_number);
+  return (int)shmem_access(page_number);
+}
+
+// Return the number of processes which have the access to the given shared memory
+int
+sys_shmem_count(void)
+{
+  int page_number = 0;
+  argint(0, &page_number);
+  if(page_number < 0 || page_number > 3)
+    return -1;
+  return shmem_count(page_number);
+}
