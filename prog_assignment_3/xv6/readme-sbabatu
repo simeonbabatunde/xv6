@@ -1,0 +1,22 @@
+This readme file contains information about the changes made to the xv6
+source code during the implementation of the Kthreads. The following files were
+edited/created during the implementation
+
+1.  defs.h - This file was modified by adding the function prototype for the system calls
+    to be implemented i.e. clone() and join()
+
+2.  syscall.h - the syscall numbers for the clone() and join() syscalls were added to this
+    file.
+
+3.  syscall.c - both syscalls were added to syscalls array, and were also declared as extern.
+
+4.  usys.S - this file was modified by adding method declaration for both system calls
+
+5.  proc.c - this file was modified by including the implementation for clone and join
+    syscalls.
+
+6.  sysproc.c - modifications in this file include the creation of wrapper function for
+    the system calls. Both functions confirm that right arguments were passed in and also
+    call the syscalls.
+
+7.
