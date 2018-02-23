@@ -20,6 +20,7 @@ void worker(void *arg_ptr);
 int
 main(int argc, char *argv[])
 {
+   printf(1, "Stack test starting ...............\n");
    ppid = getpid();
    void *stack = malloc(PGSIZE*2);
    assert(stack != NULL);
