@@ -27,9 +27,10 @@
 #include "user.h"
 #include "kthreads.h"
 
-#define LOCKS_ON 1
+#define LOCKS_ON 0
+#ifndef NULL
 #define NULL 0
-
+#endif
 
 // global lock for product
 lock_t lock;
