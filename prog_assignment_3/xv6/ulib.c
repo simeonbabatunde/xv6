@@ -142,7 +142,7 @@ thread_create(void (*worker_routine)(void*), void *arg)
 	return response;
 }
 
-int thread_join(kthread_t thrd){
+int thread_join(){
 	void *stack = malloc(sizeof(void*));
 	int response = join(&stack);
 

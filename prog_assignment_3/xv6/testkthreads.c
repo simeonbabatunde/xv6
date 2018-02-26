@@ -27,7 +27,7 @@
 #include "user.h"
 #include "kthreads.h"
 
-#define LOCKS_ON 0
+#define LOCKS_ON 1
 #ifndef NULL
 #define NULL 0
 #endif
@@ -37,7 +37,8 @@ lock_t lock;
 // our product
 int things = 0;
 int things_made = 0;
-#define MAX_CONSUME 3000000
+// #define MAX_CONSUME 3000000
+#define MAX_CONSUME 300
 void consumer(void* arg)
 {
     int i;
@@ -70,7 +71,8 @@ void consumer(void* arg)
 
 #define NUM_PROD 3
 #define NUM_CONS 2
-#define TOTAL_PRODUCTS 10000000
+// #define TOTAL_PRODUCTS 10000000
+#define TOTAL_PRODUCTS 1000
 void producer(void* arg)
 {
     int cont = 1;
