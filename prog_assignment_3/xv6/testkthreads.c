@@ -100,8 +100,10 @@ void producer(void* arg)
 
 int main(void)
 {
+  printf(1, "K THREAD Test starting ................................!\n");
     int i;
     init_lock(&lock);
+
     int indices[NUM_CONS];
     kthread_t producers[NUM_PROD];
     kthread_t consumers[NUM_CONS];
@@ -120,7 +122,8 @@ int main(void)
     }
     for (i = 0; i < NUM_CONS; i++)
     {
-        thread_join(consumers[i]);
+      printf(1, "Execution got here ................................\n");
+      thread_join(consumers[i]);
     }
     printf(1, "Remaining products: %d\n", things);
     printf(1, "Things made: %d\n", things_made);

@@ -121,11 +121,12 @@ int sys_clone(void)
 // We will call the join syscall from here
 int sys_join(void)
 {
-  void **stack;
-  // Confirm  argument is not empty
-  if(argptr(0, (void *)&stack, sizeof(void *)) < 0){
+  // void **stack;
+  int pid;
+  // Confirm  kthred pid is not empty
+  if(argptr(0, (void *)&pid, sizeof(int)) < 0){
     return -1;
   }
   // Call the join and return pid
-  return join(stack);
+  return join(pid);
 }

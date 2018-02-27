@@ -563,7 +563,7 @@ int clone(void(*fcn)(void*), void *arg, void *stack)
     return -1;
   }
 
-  // Create a copy of the process state from p and share the address space
+  // Create a copy of the process state from curproc and share the address space
   np->pgdir = curproc->pgdir;
   np->sz = curproc->sz;
   np->parent = curproc;
@@ -603,7 +603,7 @@ int clone(void(*fcn)(void*), void *arg, void *stack)
 
 // Wait for a child thread and returns the PID of waited-for child or -1,
 // Location of the child's user stack is copied into the argument stack.
-int join(void **stack)
+int join(int pid)
 {
   struct proc *p;
   struct proc *curproc = myproc();
@@ -614,8 +614,8 @@ int join(void **stack)
     ownChildthreads = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       // Skip if process p is not a child or does not share address space or
-      // it's the calling thread itself
-      if(p->parent != curproc || p->pgdir != curproc->pgdir || curproc->pid == p->pid){
+      // it's the calling thread itself, or not the same pid
+      if(p->parent != curproc || p->pgdir != curproc->pgdir || curproc->pid == p->pid || p->pid != pid){
         continue;
       }
       ownChildthreads = 1;
@@ -637,10 +637,10 @@ int join(void **stack)
         p->name[0] = 0;
         p->killed = 0;
         // Return stack of the zombie child thread
-        *stack = p->stack;
+        // *stack = p->stack;
         *tmp = proc_id;
         release(&ptable.lock);
-        return proc_id;
+        return 0;
       }
     }
     // Exit if no children exist or process is killed.

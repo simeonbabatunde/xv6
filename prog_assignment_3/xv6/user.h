@@ -29,7 +29,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int clone(void (*start_routine)(void*), void *, void *);
-int join(void**);
+int join(int);
 
 // ulib.c
 int stat(char*, struct stat*);

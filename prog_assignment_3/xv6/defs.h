@@ -122,7 +122,7 @@ void            wakeup(void*);
 void            yield(void);
 // Add the function prototype for both system calls
 int             clone(void(*fcn)(void*), void *, void*);
-int             join(void**);
+int             join(int);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
