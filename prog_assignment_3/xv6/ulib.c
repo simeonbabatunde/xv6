@@ -124,9 +124,10 @@ void lock_release(lock_t *lock){
 }
 
 
-int
+struct kthread
 thread_create(void (*worker_routine)(void*), void *arg)
 {
+  struct kthread thread;
 	lock_t lck;
 	init_lock(&lck);
 	lock_acquire(&lck);
@@ -138,13 +139,13 @@ thread_create(void (*worker_routine)(void*), void *arg)
 		stack = stack + (PGSIZE - (uint)stack % PGSIZE);
   }
 
-	int response = clone(worker_routine,arg,stack);
-	return response;
+	thread.pid = clone(worker_routine,arg,stack);
+	return thread;
 }
 
-int thread_join(kthread_t pid){
+int thread_join(struct kthread thread){
 	// void *stack = malloc(sizeof(void*));
-	int response = join(pid);
+	int response = join(thread.pid);
 
 	return response;
 }
