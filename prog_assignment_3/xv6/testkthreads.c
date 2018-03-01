@@ -37,15 +37,15 @@ lock_t lock;
 // our product
 int things = 0;
 int things_made = 0;
-// #define MAX_CONSUME 3000000
-#define MAX_CONSUME 300
+#define MAX_CONSUME 3000000
+// #define MAX_CONSUME 300
 void consumer(void* arg)
 {
     int i;
     int consumed = 0;
     // dumb little busy sleep
     for (i = 0; i < 200; i++);
-
+    printf(1, "Execution got here ................................\n");
     while (consumed < MAX_CONSUME)
     {
         // not thread safe but give producers time
@@ -71,8 +71,8 @@ void consumer(void* arg)
 
 #define NUM_PROD 3
 #define NUM_CONS 2
-// #define TOTAL_PRODUCTS 10000000
-#define TOTAL_PRODUCTS 1000
+#define TOTAL_PRODUCTS 10000000
+// #define TOTAL_PRODUCTS 1000
 void producer(void* arg)
 {
     int cont = 1;
@@ -100,7 +100,7 @@ void producer(void* arg)
 
 int main(void)
 {
-  printf(1, "K THREAD Test starting ................................!\n");
+  printf(1, "KTHREAD Test starting ................................!\n");
     int i;
     init_lock(&lock);
 
@@ -122,7 +122,6 @@ int main(void)
     }
     for (i = 0; i < NUM_CONS; i++)
     {
-      printf(1, "Execution got here ................................\n");
       thread_join(consumers[i]);
     }
     printf(1, "Remaining products: %d\n", things);
