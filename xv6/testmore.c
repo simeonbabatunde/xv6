@@ -3,6 +3,7 @@
 
 int ppid;
 #define PGSIZE (4096)
+#define NULL 0
 
 volatile int global = 1;
 
