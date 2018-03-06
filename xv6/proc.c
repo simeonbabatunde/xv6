@@ -272,9 +272,16 @@ exit(void)
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
+
+      if(p->pgdir == curproc->pgdir){
+        p->parent = 0;
+        p->state = ZOMBIE;
+      }else{
+        p->parent = initproc;
+        if(p->state == ZOMBIE){
+          wakeup1(initproc);
+        }
+      }
     }
   }
 
@@ -300,6 +307,12 @@ wait(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != curproc)
         continue;
+
+      // Only wait for child process and not threads
+      if(p->pgdir == curproc->pgdir && p->state == ZOMBIE && p->pid != 0){
+        continue;
+      }
+
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.
@@ -622,11 +635,6 @@ int join(int pid)
 
       if(p->state == ZOMBIE){
         // Retrieve zombie child process ID for return
-
-        void *stackAddress = (void *)p->parent->tf->esp + 7*sizeof(void *);
-        *(uint *)stackAddress = p->tf->ebp;
-        *(uint *)stackAddress += 3 * sizeof(void *) - PGSIZE;
-
         kfree(p->kstack);
         p->kstack = 0;
         p->state = UNUSED;

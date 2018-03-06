@@ -99,7 +99,6 @@ void producer(void* arg)
 
 int main(void)
 {
-  printf(1, "KTHREAD Test starting ................................!\n");
     int i;
     init_lock(&lock);
 
