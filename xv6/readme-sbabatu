@@ -12,11 +12,27 @@ edited/created during the implementation
 
 4.  usys.S - this file was modified by adding method declaration for both system calls
 
-5.  proc.c - this file was modified by including the implementation for clone and join
-    syscalls.
+5.  proc.c - this file was modified by including the implementation for both clone and join
+    syscalls. Also, the wait() function was updated to only wait for child process and not
+    threads. The exit() function was updated to clear the parent value of a thread to avoid
+    problem in wait function. Finally, the growproc() function was modified to increase the
+    thread size to the new size.
 
-6.  sysproc.c - modifications in this file include the creation of wrapper function for
-    the system calls. Both functions confirm that right arguments were passed in and also
-    call the syscalls.
+6.  sysproc.c - modifications in this file include the creation of wrapper functions sys_clone()
+    and sys_join() for the system calls. Both functions confirm that right arguments were passed
+    in and also call the syscalls.
 
-7.
+7.  kthreads.h - This is the header file created for the kthreads. It contains structures and
+    function prototypes for the thread functions.
+
+8.  ulib.c - this file was updated to include the implementation of the kernel thread library
+    as well as the lock implementation. The memory allocator was moved to the bottom of the file
+    to eliminate some dependency issues.
+
+9.  teststack.c - this file contains the test case that checks if the stack was setup correctly
+
+10. testmore.c - this file contains test cases that checks for separation of concerns between
+    fork() and clone(), as well as wait() and join().
+
+11. testfdscriptor - this file contains the test case that checks if clone copies file descriptors
+    but does not share created ones with parent.

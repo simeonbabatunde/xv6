@@ -182,7 +182,7 @@ growproc(int n)
     if(p->pgdir != curproc->pgdir){
     	continue;
     }
-    p->sz=sz;               // Update the thread process size
+    p->sz=sz;           // Update the thread process size
   }
     curproc->sz = sz;
     switchuvm(curproc);
