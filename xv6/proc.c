@@ -160,32 +160,33 @@ int
 growproc(int n)
 {
   uint sz;
-  // struct proc *p;
+  struct proc *p;
   struct proc *curproc = myproc();
-  // pde_t *temp = curproc->pgdir;
 
+  // Lets grow the process size and update the related threads as well
+  acquire(&ptable.lock);
   sz = curproc->sz;
   if(n > 0){
-    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
+    }
   } else if(n < 0){
-    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
+    }
   }
-  curproc->sz = sz;
-  switchuvm(curproc);
-
-  // //
-  // acquire(&ptable.lock);
-  // for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-  //   if(p->pgdir == temp){
-  //     p->sz = sz;
-  //     acquire(&lgp);
-  //     switchuvm(p);
-  //     release(&lgp);
-  //    }
-  // }
-  // release(&ptable.lock);
+  // If not a thread then keep scanning the page table
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pgdir != curproc->pgdir){
+    	continue;
+    }
+    p->sz=sz;               // Update the thread process size
+  }
+    curproc->sz = sz;
+    switchuvm(curproc);
+    release(&ptable.lock);
 
   return 0;
 }
@@ -601,13 +602,12 @@ int clone(void(*fcn)(void*), void *arg, void *stack)
   return new_pid;
 }
 
-// Wait for a child thread and returns the PID of waited-for child or -1,
-// Location of the child's user stack is copied into the argument stack.
+// Wait for a child thread with the PID and return 0 or -1 for failure
 int join(int pid)
 {
   struct proc *p;
   struct proc *curproc = myproc();
-  int ownChildthreads, proc_id;
+  int ownChildthreads;
 
   acquire(&ptable.lock);
   for(;;){
@@ -622,8 +622,6 @@ int join(int pid)
 
       if(p->state == ZOMBIE){
         // Retrieve zombie child process ID for return
-        proc_id = p->pid;
-        int *tmp = (int*) 0x1FD8;
 
         void *stackAddress = (void *)p->parent->tf->esp + 7*sizeof(void *);
         *(uint *)stackAddress = p->tf->ebp;
@@ -636,9 +634,7 @@ int join(int pid)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
-        // Return stack of the zombie child thread
-        // *stack = p->stack;
-        *tmp = proc_id;
+
         release(&ptable.lock);
         return 0;
       }
