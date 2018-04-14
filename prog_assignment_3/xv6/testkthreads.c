@@ -28,9 +28,8 @@
 #include "kthreads.h"
 
 #define LOCKS_ON 1
-#ifndef NULL
 #define NULL 0
-#endif
+
 
 // global lock for product
 lock_t lock;
@@ -99,7 +98,6 @@ void producer(void* arg)
 
 int main(void)
 {
-  printf(1, "KTHREAD Test starting ................................!\n");
     int i;
     init_lock(&lock);
 

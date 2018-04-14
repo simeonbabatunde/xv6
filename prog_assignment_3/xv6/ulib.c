@@ -107,7 +107,7 @@ memmove(void *vdst, void *vsrc, int n)
 }
 
 
-// Below is the implementation of the thread library
+// Below is the implementation of the lock and thread library
 int init_lock(lock_t *lock)
 {
 	lock->flag = 0;
@@ -123,7 +123,7 @@ void lock_release(lock_t *lock){
 	xchg(&lock->flag, 0);
 }
 
-
+// This is the implementation of thread_create
 struct kthread
 thread_create(void (*worker_routine)(void*), void *arg)
 {
@@ -158,7 +158,6 @@ int thread_join(struct kthread thread){
 
 
 // Memory allocator moved into this place,
-
 typedef long Align;
 
 union header {

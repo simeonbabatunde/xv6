@@ -162,15 +162,20 @@ growproc(int n)
   uint sz;
   struct proc *p;
   struct proc *curproc = myproc();
-  // pde_t *temp = curproc->pgdir;
 
+  // Lets grow the process size and update the related threads as well
+  acquire(&ptable.lock);
   sz = curproc->sz;
   if(n > 0){
-    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
+    }
   } else if(n < 0){
-    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0){
+      release(&ptable.lock);
       return -1;
+    }
   }
   curproc->sz = sz;
   acquire(&ptable.lock);
@@ -268,9 +273,16 @@ exit(void)
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
-      p->parent = initproc;
-      if(p->state == ZOMBIE)
-        wakeup1(initproc);
+
+      if(p->pgdir == curproc->pgdir){
+        p->parent = 0;
+        p->state = ZOMBIE;
+      }else{
+        p->parent = initproc;
+        if(p->state == ZOMBIE){
+          wakeup1(initproc);
+        }
+      }
     }
   }
 
@@ -296,6 +308,12 @@ wait(void)
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != curproc || p->isthread == 1)
         continue;
+
+      // Only wait for child process and not threads
+      if(p->pgdir == curproc->pgdir && p->state == ZOMBIE && p->pid != 0){
+        continue;
+      }
+
       havekids = 1;
       if(p->state == ZOMBIE){
         // Found one.

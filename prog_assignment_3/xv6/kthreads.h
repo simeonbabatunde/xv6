@@ -16,6 +16,4 @@ void lock_release(lock_t *lock);
 struct kthread thread_create(void (*worker_routine)(void*), void *arg);
 int thread_join(struct kthread);
 
-
-
 #endif // _KTHREADS_H_
