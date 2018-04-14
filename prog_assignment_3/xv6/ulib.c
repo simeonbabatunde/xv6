@@ -140,11 +140,17 @@ thread_create(void (*worker_routine)(void*), void *arg)
   }
 
 	thread.pid = clone(worker_routine,arg,stack);
-	return thread;
+  if (thread.pid == 0) {
+      (*worker_routine) (arg);
+      free(stack);
+      exit();
+    } else {
+      return thread;
+    }
 }
 
 int thread_join(struct kthread thread){
-	// void *stack = malloc(sizeof(void*));
+
 	int response = join(thread.pid);
 
 	return response;

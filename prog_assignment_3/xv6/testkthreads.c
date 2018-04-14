@@ -45,11 +45,10 @@ void consumer(void* arg)
     int consumed = 0;
     // dumb little busy sleep
     for (i = 0; i < 200; i++);
-    printf(1, "Execution got here ................................\n");
     while (consumed < MAX_CONSUME)
     {
         // not thread safe but give producers time
-        while(things <= 0);
+        // while(things <= 0);
         #if LOCKS_ON
         lock_acquire(&lock);
         #endif

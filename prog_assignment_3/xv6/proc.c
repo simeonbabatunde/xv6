@@ -160,7 +160,7 @@ int
 growproc(int n)
 {
   uint sz;
-  // struct proc *p;
+  struct proc *p;
   struct proc *curproc = myproc();
   // pde_t *temp = curproc->pgdir;
 
@@ -173,19 +173,14 @@ growproc(int n)
       return -1;
   }
   curproc->sz = sz;
+  acquire(&ptable.lock);
+  for(p=ptable.proc; p<&ptable.proc[NPROC]; p++){
+    // Update the stack size of the thread as well
+    if(p->parent != curproc || p->isthread == 1 )
+     p->sz = sz;
+  }
+  release(&ptable.lock);
   switchuvm(curproc);
-
-  // //
-  // acquire(&ptable.lock);
-  // for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-  //   if(p->pgdir == temp){
-  //     p->sz = sz;
-  //     acquire(&lgp);
-  //     switchuvm(p);
-  //     release(&lgp);
-  //    }
-  // }
-  // release(&ptable.lock);
 
   return 0;
 }
@@ -212,6 +207,8 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  // Ensure that this is not a thread but process
+  np->isthread = 0;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -297,7 +294,7 @@ wait(void)
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      if(p->parent != curproc || p->isthread == 1)
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -306,11 +303,12 @@ wait(void)
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
+        p->state = UNUSED;
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
-        p->state = UNUSED;
+        p->isthread = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -565,6 +563,7 @@ int clone(void(*fcn)(void*), void *arg, void *stack)
 
   // Create a copy of the process state from curproc and share the address space
   np->pgdir = curproc->pgdir;
+  np->isthread = 1;
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -593,37 +592,40 @@ int clone(void(*fcn)(void*), void *arg, void *stack)
   np->cwd = idup(curproc->cwd);
   // set new process  state to runnable and copy the process name
   np->tf->eax = 0;
-  np->state = RUNNABLE;
+
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
   // Copy and return the process id
   new_pid = np->pid;
 
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
+
   return new_pid;
 }
 
-// Wait for a child thread and returns the PID of waited-for child or -1,
-// Location of the child's user stack is copied into the argument stack.
+// Wait for a child thread with the PID return 0 for success or -1 for failure,
 int join(int pid)
 {
   struct proc *p;
   struct proc *curproc = myproc();
-  int ownChildthreads, proc_id;
+  int ownChildthreads;
 
   acquire(&ptable.lock);
   for(;;){
     ownChildthreads = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       // Skip if process p is not a child or does not share address space or
-      // it's the calling thread itself, or not the same pid
-      if(p->parent != curproc || p->pgdir != curproc->pgdir || curproc->pid == p->pid || p->pid != pid){
+      // it's the calling thread itself
+      if(p->parent != curproc || p->isthread != 1 || p->pid == curproc->pid){
         continue;
       }
       ownChildthreads = 1;
-
-      if(p->state == ZOMBIE){
+      // Check the Zombie pool for the current thread
+      if(p->state == ZOMBIE && p->pid == pid){
         // Retrieve zombie child process ID for return
-        proc_id = p->pid;
-        int *tmp = (int*) 0x1FD8;
+        // proc_id = p->pid;
+        // int *tmp = (int*) 0x1FD8;
 
         void *stackAddress = (void *)p->parent->tf->esp + 7*sizeof(void *);
         *(uint *)stackAddress = p->tf->ebp;
@@ -636,9 +638,8 @@ int join(int pid)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
-        // Return stack of the zombie child thread
-        // *stack = p->stack;
-        *tmp = proc_id;
+        p->isthread = 0;
+
         release(&ptable.lock);
         return 0;
       }
@@ -650,5 +651,4 @@ int join(int pid)
     }
     sleep(curproc, &ptable.lock);
   }
-  return 0;
 }
