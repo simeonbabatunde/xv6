@@ -10,24 +10,23 @@
 #include <string.h>
 
 // Function prototypes
-void addr_confirmation(char *new_bitmap, uint addr);
-int bitmap_compare(char *bitmap1, char *bitmap2, int size);
-uint get_block_addr(uint off, struct dinode *current_dip, int indirect_flag);
-void dfs(int *inode_ref, char* new_bitmap, int inum, int parent_inum);
+int checkRootInode();
 
 // Let's initialize the entry-point of each segment in the file system
 void *imgfile;
 void *datablk;
 struct superblock *superblk;
 struct dinode *diskino;
-char *bitmap;
+void *bitmap;
+
+int fdescriptor;
+struct stat statbuff;
+int data_offset, bitmap_size;
+struct dinode *temp_diskino;
 
 int main(int argc, char* argv[])
 {
-  int fdescriptor;
-  struct stat statbuff;
-  int data_offset, bitmap_size;
-  struct dinode *temp_diskino;
+  int i, j, blockAddr, type;
 
   if(argc < 2){
     fprintf(stderr, "Usage: %s file_system.img\n", argv[0]);
@@ -36,7 +35,6 @@ int main(int argc, char* argv[])
 
 
   fdescriptor = open(argv[1], O_RDONLY);       // Lets read the file image
-  printf("%d\n", fdescriptor);
   if(fdescriptor < 0){
     fprintf(stderr, "image not found.\n");
     exit(1);
@@ -52,195 +50,239 @@ int main(int argc, char* argv[])
   assert(imgfile != MAP_FAILED);
 
   superblk = (struct superblock *) (imgfile + BSIZE);   //Read the super block[1]
-  diskino = (struct dinode *) (imgfile + 2*BSIZE);      //Read the inode block[2]
-  bitmap = (char *) (imgfile + (superblk->ninodes/IPB + 3) * BSIZE);  //Read the bitmap block[]
+  diskino = (struct dinode *) (imgfile + 2*BSIZE);      // First inode block in list of inodes
+  bitmap = (void *) (imgfile + (superblk->ninodes/IPB + 3) * BSIZE);  // Pointer to bitmap location
   datablk = (void *) (imgfile + (superblk->ninodes/IPB + superblk->nblocks/BPB + 4) * BSIZE); //Read the data block[]
 
-  data_offset = superblk->ninodes/IPB + superblk->nblocks/BPB + 4;
-  bitmap_size = data_offset / 8;
-  int inode_ref[superblk->ninodes + 1];
-  char new_bitmap[bitmap_size];
-  char end = 0x00;
+  int usedBlocks[superblk->size];
+  int numInodeLinks[superblk->ninodes];
+  int inodeUsed[superblk->ninodes];           // List of used inodes
+  int usedInodeDirectory[superblk->ninodes];  // Directory list for used inodes
 
-  memset(inode_ref, 0, (superblk->ninodes + 1) * sizeof(int));     //Initialize the inode_ref to 0
-  memset(new_bitmap, 0, bitmap_size);
-  memset(new_bitmap, 0xFF, data_offset / 8);
-
-  for(int i = 0; i < data_offset % 8; ++i){
-    end = (end << 1) | 0x01;
+  // Lets initialize block list to 0
+  for(j = 0; j < superblk->size; j++){
+    usedBlocks[j] = 0;
   }
-  new_bitmap[data_offset / 8] = end;
+  // Mark used blocks as used in list
+  for(j = 0; j < (superblk->ninodes/IPB + 3 + (superblk->size/(BSIZE*8) + 1)); j++){
+    usedBlocks[j] = 1;
+  }
 
-  // if(!(ROOTINO + diskino) || (ROOTINO + diskino)->type != T_DIR){ // Check if root dir exist
-  //   fprintf(stderr, "ERROR: root directory does not exist.\n");
-  //   exit(1);
-  // }
+  type  = checkRootInode();
 
-  dfs(inode_ref, new_bitmap, ROOTINO, ROOTINO);
+  // Loop through inodes
+  for(i = 0; i < superblk->ninodes; i++){
+    int k;
+    struct dirent *currDir;
+    // type = diskino->type;
 
-  temp_diskino = diskino;
-  for(int i = 1; i < superblk->ninodes; i++){
-    temp_diskino++;
-    if(temp_diskino->type == 0){          //Only work with allocated inodes
-      continue;
+    // Lets check for valid file ty
+    // Check for valid file type
+		if(type >= 0 && type <= 3){
+      if(type != 0){
+        // If directory, check to make sure it is a valid directory
+        if(type == T_DIR){
+          void *blkAddr = imgfile + diskino->addrs[0] * BSIZE;
+		      currDir = (struct dirent*)(blkAddr);
+					// Lets check for valid directory format
+		      if(strcmp(currDir->name, ".") != 0){
+            fprintf(stderr, "ERROR: directory not properly formatted.\n");
+		        exit(1);
+          }
+          currDir++;
+		      if(strcmp(currDir->name, "..") != 0){
+            fprintf(stderr, "ERROR: directory not properly formatted.\n");
+            exit(1);
+          }
+          // Check 5: valid parent directory
+		      if(i != 1 && currDir->inum == i){
+            fprintf(stderr, "ERROR: parent directory mismatch.\n");
+            return 1;
+          }
+          struct dinode *parentDir = (struct dinode *)(imgfile + 2*BSIZE + currDir->inum*sizeof(struct dinode));
+          if(parentDir->type != T_DIR){
+            fprintf(stderr, "ERROR: parent directory mismatch.\n");
+            return 1;
+          }
+          int validPrntDir = 0;
+					int x, y, z;
+          for(x = 0; x < NDIRECT; x++){
+            struct dirent *currDir;
+            if(parentDir->addrs[x] != 0){
+							currDir = (struct dirent *)(imgfile + parentDir->addrs[x]*BSIZE);
+							// Check for valid parent directory
+              for(y = 0; y < BSIZE/sizeof(struct dirent); y++){
+                if(currDir->inum != i){
+                  validPrntDir = 1;
+								}
+								currDir++;
+              }
+            }
+		        if(diskino->addrs[x] != 0){
+              currDir = (struct dirent *)(imgfile + diskino->addrs[x]*BSIZE);
+							// Find used inodes and mark them in list
+              for(z = 0; z < BSIZE/sizeof(struct dirent *); x++){
+                if(currDir->inum == 0){
+                  break;
+								}
+                usedInodeDirectory[currDir->inum] = 1;
+								// For each used inode found also increment reference count
+                if(strcmp(currDir->name,".") != 0 && strcmp(currDir->name,"..") != 0){
+                  numInodeLinks[currDir->inum]++;
+                }
+                currDir++;
+              }
+            }
+          }
+          // Check 5: valid parent directory
+          if(validPrntDir == 0){
+            fprintf(stderr, "ERROR: parent directory mismatch.\n");
+            exit(1);
+          }
+        }
+
+        for(k = 0; k < NDIRECT+1; k++){
+          int x;
+          blockAddr = diskino->addrs[k];
+          if(blockAddr != 0){
+            if (blockAddr != 0){
+              // Lets check for bad address in inode
+              if((blockAddr) < ((int)BBLOCK(superblk->nblocks, superblk->ninodes))+1
+                || blockAddr > (superblk->size * BSIZE)){
+                fprintf(stderr, "ERROR: bad address in inode.\n");
+                exit(1);
+              }
+              // Check 8: check used blocks are only used once
+              if(usedBlocks[blockAddr] == 1){
+                fprintf(stderr, "ERROR: address used more than once.\n");
+                exit(1);
+              }
+            }
+            if(type == 1 && blockAddr > 1 && k == 0){
+              int checkDirFormat = 0, isRoot = 0, checkRootDir = 0;
+						  if(i == 1){
+                isRoot++;
+              }
+              for(x = 0; x < NDIRECT+1; x++){
+                currDir = (struct dirent *)(imgfile + (blockAddr*BSIZE) + x*(sizeof(struct dirent)));
+                if(currDir->inum != 0){
+                  if(strcmp(currDir->name, ".") == 0 || strcmp(currDir->name, "..") == 0){
+                    checkDirFormat++;
+                    if(isRoot == 1 && currDir->inum == 1)
+                      checkRootDir++;
+								}
+							}
+						}
+            // Check 4: valid directory format
+						if(checkDirFormat != 1){
+              fprintf(stderr, "ERROR: directory not properly formatted.\n");
+							exit(1);
+						}
+            // Check 3: valid root inode
+						if(isRoot == 1){
+              if(checkRootDir != 2){
+                fprintf(stderr, "ERROR: root directory does not exist.\n");
+								exit(1);
+							}
+						}
+					}
+        }
+        if(diskino->size > BSIZE * NDIRECT){
+          int *indirect = (int *)(imgfile + (blockAddr*BSIZE));
+          for(k = 0; k < BSIZE/4; k++){
+            int block = *(indirect + k);
+            // Check if address is valid
+            if(block != 0){
+              // Check 2: bad address in inode
+              if(block < ((int)BBLOCK(superblk->nblocks, superblk->ninodes))+1){
+                fprintf(stderr, "ERROR: bad address in inode.\n");
+                exit(1);
+              }
+              // Check 8: check used blocks are only used once
+              if(usedBlocks[block] == 1){
+                fprintf(stderr, "ERROR: address used more than once.\n");
+                exit(1);
+              }
+              usedBlocks[block] = 1;
+              // Check 6: check used blocks in bitmap
+              int bitmapLocation = (*((char*)bitmap + (block >> 3)) >> (block & 7)) & 1;
+              if(bitmapLocation == 0){
+                fprintf(stderr, "ERROR: address used by inode but marked free in bitmap.\n");
+                exit(1);
+              }
+            }
+          }
+        }
+      }
+      diskino++;
+    }else{
+      // Check 1: valid type
+			fprintf(stderr,"ERROR: bad inode.\n");
+			exit(1);
     }
-    // Throw errors for Invalid types
-    if(temp_diskino->type != T_FILE && temp_diskino->type != T_DIR
-        && temp_diskino->type != T_DEV){
-      fprintf(stderr, "ERROR: bad inode.\n");
+  }
+  numInodeLinks[1]++;
+  // Check 7: check used blocks are marked bitmap and are used
+  int block;
+  for(block = 0; block < superblk->size; block++){
+    int bitmapLocation = (*((char*)bitmap + (block >> 3)) >> (block & 7)) & 1;
+    if(bitmapLocation == 1){
+      if(usedBlocks[block] == 0){
+        fprintf(stderr, "ERROR: bitmap marks block in use but it is not in use.\n");
+        exit(1);
+      }
+    }
+  }
+
+  diskino = (struct dinode *)(imgfile + 2*BSIZE);
+  for(i = 0; i < superblk->ninodes; i++){
+    type = diskino->type;
+    if(type != 0){
+      inodeUsed[i] = 1;
+    }
+    // Check 9: check used inodes reference a directory
+    if(inodeUsed[i] == 1 && usedInodeDirectory[i] == 0){
+      fprintf(stderr, "ERROR: inode marked use but not found in a directory.\n");
       exit(1);
     }
-
-    // Throw error if Inode in use but not in the directory
-    // if(inode_ref[i] == 0){
-    //   fprintf(stderr, "ERROR: inode marked use but not found in a directory.\n");
-    //   exit(1);
-    // }
-
-    // Throw error for Bad reference count
-    if(inode_ref[i] != temp_diskino->nlink){
-      fprintf(stderr, "ERROR: bad reference count for file.\n");
+    // Check 10: check used inodes in directory are in inode table
+    if(usedInodeDirectory[i] == 1 && inodeUsed[i] == 0){
+      fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
       exit(1);
     }
-
-    // Throw error for Extra links on directories
-    if(temp_diskino->type == T_DIR && temp_diskino->nlink > 1){
+		// Check 12: No extra links allowed for directories
+    if(type == 1 && numInodeLinks[i] != 1){
       fprintf(stderr, "ERROR: directory appears more than once in file system.\n");
       exit(1);
     }
+		// Check 11: hard links to file match files reference count
+    if(numInodeLinks[i] != diskino->nlink){
+      fprintf(stderr, "ERROR: bad reference count for file.\n");
+      exit(1);
+    }
+		diskino++;
   }
+}
 
-  // Throw error when not in use but marked in use
-  if(bitmap_compare(bitmap, new_bitmap, bitmap_size)){
-    fprintf(stderr, "ERROR: bitmap marks block in use but it is not in use.\n");
-    exit(1);
-  }
 
   return 0;
 }
 
 
 // function implementations
-// Confirm if the address is valid
-void addr_confirmation(char *new_bitmap, uint addr){
-  if(addr == 0){
-    return;
-  }
-
-  // When given address is out of bound
-  if(addr < (superblk->ninodes/IPB + superblk->nblocks/BPB + 4)
-      || addr >= (superblk->ninodes/IPB + superblk->nblocks/BPB + 4 + superblk->nblocks)){
-    fprintf(stderr, "ERROR: bad address in inode.\n");
+int checkRootInode(){
+	if (lseek(fdescriptor, superblk->inodestart * BSIZE + sizeof(struct dinode),
+    SEEK_SET) != superblk->inodestart * BSIZE + sizeof(struct dinode)){
+		perror("lseek failed");
+		exit(1);
+	}
+	u_char buf[sizeof(struct dinode)];
+	struct dinode temp_inode;
+	read(fdescriptor, buf, sizeof(struct dinode));
+	memmove(&temp_inode, buf, sizeof(struct dinode));
+	if(temp_inode.type != ROOTINO){
+    fprintf(stderr, "ERROR: root directory does not exist.\n");
     exit(1);
   }
-
-  // In use but marked free
-  char byte = *(bitmap + addr / 8);
-  if(!((byte >> (addr % 8)) & 0x01)){
-    fprintf(stderr, "ERROR: address used by inode but marked free in bitmap.\n");
-    exit(1);
-  }
-}
-
-
-// Compare two bitmaps. Return 1 when they are different, 0 when the same
-int bitmap_compare(char *bitmap1, char *bitmap2, int size){
-  for(int i = 0; i < size; ++i){
-    if(*(bitmap1++) != *(bitmap2++)){
-      return 1;
-    }
-  }
-  return 0;
-}
-
-// Get the block number
-uint get_block_addr(uint off, struct dinode *current_dip, int indirect_flag){
-  if(off / BSIZE <= NDIRECT && !indirect_flag){
-    return current_dip->addrs[off / BSIZE];
-  }else{
-    return *((uint*) (imgfile + current_dip->addrs[NDIRECT] * BSIZE) + off / BSIZE - NDIRECT);
-  }
-}
-
-
-void dfs(int *inode_ref, char* new_bitmap, int inum, int parent_inum){
-  struct dinode *temp_diskino = diskino + inum;
-
-  // if(temp_diskino->type == 0){
-  //   fprintf(stderr, "ERROR: inode referred to in directory but marked free.\n");
-  //   exit(1);
-  // }
-
-  // Lets check for empty dir without . and ..
-  if(temp_diskino->type == T_DIR && temp_diskino->size == 0){
-    fprintf(stderr, "ERROR: directory not properly formatted.\n");
-  }
-
-  // Lets update current node's reference count
-  inode_ref[inum]++;
-  if(inode_ref[inum] > 1 && temp_diskino->type == T_DIR){
-    fprintf(stderr, "ERROR: directory appears more than once in file system.\n");
-    exit(1);
-  }
-
-  int off;
-  // Offset at NDIRECT will need two address check:
-  // One for addrs[NDIRECT], and one for the first addr in indirect block
-  int indirect_flag = 0;
-
-  for(off = 0; off < temp_diskino->size; off += BSIZE){
-    uint addr = get_block_addr(off, temp_diskino, indirect_flag);
-    addr_confirmation(new_bitmap, addr);
-
-    if(off / BSIZE == NDIRECT && !indirect_flag){
-      off -= BSIZE;
-      indirect_flag = 1;
-    }
-
-    // Lets check for duplicate and mark on new bitmap when the inode first occur
-    if(inode_ref[inum] == 1){
-      char byte = *(new_bitmap + addr / 8);
-      if((byte >> (addr % 8)) & 0x01){
-        fprintf(stderr, "ERROR: address used more than once.\n");
-        exit(1);
-      }else{
-        byte = byte | (0x01 << (addr % 8));
-        *(new_bitmap + addr / 8) = byte;
-      }
-    }
-
-    if(temp_diskino->type == T_DIR){
-      struct dirent *de = (struct dirent *) (imgfile + addr * BSIZE);
-
-      // Lets confirm the resence of . and .. in DIR
-      if(off == 0){
-        if(strcmp(de->name, ".")){
-          fprintf(stderr, "ERROR: directory not properly formatted.\n");
-          exit(1);
-        }
-        if (strcmp((de + 1)->name, "..")) {
-          fprintf(stderr, "ERROR: directory not properly formatted.\n");
-          exit(1);
-        }
-
-        // Lets confirm the presence of parent
-        if((de + 1)->inum != parent_inum){
-          // if(inum == ROOTINO){
-          //   fprintf(stderr, "ERROR: root directory does not exist.\n");
-          // }else{
-          //   fprintf(stderr, "ERROR: parent directory mismatch.\n");
-          // }
-          // exit(1);
-        }
-        de += 2;
-      }
-
-      for(; de < (struct dirent *)(ulong)(imgfile + (addr + 1) * BSIZE); de++){
-        if(de->inum == 0){
-          continue;
-        }
-        dfs(inode_ref, new_bitmap, de->inum, inum);
-      }
-    }
-  }
+  return temp_inode.type;
 }
