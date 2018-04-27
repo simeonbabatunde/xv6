@@ -2,7 +2,7 @@
 CC = gcc
 CFLAGS = -g -Wall
 
-OBJS= fscheck.o
+OBJS= fscheck1.o
 
 INCS=fscheck.h
 

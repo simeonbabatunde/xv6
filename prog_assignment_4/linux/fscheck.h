@@ -1,6 +1,7 @@
 // On-disk file system format.
 // Both the kernel and user programs use this header file.
 
+
 #define ROOTINO 1  // root i-number
 #define BSIZE 512  // block size
 
@@ -20,16 +21,18 @@ struct superblock {
   uint bmapstart;    // Block number of first free map block
 };
 
+#define SUPERBLOCK 1  // Block containing the superblock
+
 #define NDIRECT 12
 #define NINDIRECT (BSIZE / sizeof(uint))
 #define MAXFILE (NDIRECT + NINDIRECT)
 
 // On-disk inode structure
 struct dinode {
-  short type;           // File type
+  short type;           // File type (0 means inode is free...distinguished between files, dir, and special devices)
   short major;          // Major device number (T_DEV only)
   short minor;          // Minor device number (T_DEV only)
-  short nlink;          // Number of links to inode in file system
+  short nlink;          // Number of links to inode in file system (directory entries that refer to this node)
   uint size;            // Size of file (bytes)
   uint addrs[NDIRECT+1];   // Data block addresses
 };
@@ -44,8 +47,7 @@ struct dinode {
 #define BPB           (BSIZE*8)
 
 // Block of free map containing bit for block b
-// #define BBLOCK(b, sb) (b/BPB + sb.bmapstart)
-#define BBLOCK(b, ninodes) (b/BPB + (ninodes)/IPB + 3)
+#define BBLOCK(b, sb) (b/BPB + sb.bmapstart)
 
 // Directory is a file containing a sequence of dirent structures.
 #define DIRSIZ 14
@@ -55,8 +57,5 @@ struct dirent {
   char name[DIRSIZ];
 };
 
-#define T_DIR       1   // Directory
-#define T_FILE      2   // File
-#define T_DEV       3   // Special device
-
-#define DPB           (BSIZE / sizeof(struct dirent))
+// Directory entries per block
+#define DPB       (BSIZE / sizeof(struct dirent))
